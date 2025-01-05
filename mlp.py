@@ -3,6 +3,7 @@ import random
 import numpy as np
 import pandas as pd
 import torch.nn as nn
+import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import accuracy_score
@@ -12,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-
+from sklearn.manifold import TSNE
 
 import logging
 logging.basicConfig(
@@ -29,7 +30,9 @@ import argparse
 class Args:
     def parseargs(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', type=str, default="manual", help="test or select")
+        parser.add_argument('-e', '--epoch', type=int, default=50)
+        parser.add_argument('-b', '--batch', type=int, default=100)
+        parser.add_argument('-l', '--lr', type=float, default=0.001)
 
         self.pargs = parser.parse_args()
         for key, value in vars(self.pargs).items():
@@ -119,6 +122,7 @@ if __name__ == '__main__':
     #     print(f'Epoch [{epoch+1}], Loss: {loss.item():.4f}')
     # # 验证
     # model.eval()
+    # yval = []
     # with torch.no_grad():
     #     correct = 0
     #     total = 0
@@ -128,9 +132,25 @@ if __name__ == '__main__':
     #         _, predicted = torch.max(outputs.data, 1)
     #         total += labels.size(0)
     #         correct += (predicted == labels).sum().item()
+    #         yval.append(predicted)
         
+    #     yval = torch.cat(yval)
     #     accuracy = 100 * correct / total
     #     print(f'Accuracy of the model on the val set: {accuracy:.2f}%')
+
+    # ## t-SNE 可视化
+    # tsne = TSNE(n_components=2, random_state=seed)
+    # X_tsne = tsne.fit_transform(X_val)
+    # plt.figure(figsize=(8, 6))
+    # scatter = plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=yval.cpu().numpy(), cmap='viridis', alpha=0.7)
+    # plt.colorbar(scatter)
+    # plt.title("t-SNE Visualization of Validation Set Predictions")
+    # plt.xlabel("t-SNE Component 1")
+    # plt.ylabel("t-SNE Component 2")
+    # plt.savefig('tsne_visualization.png')  # 保存为PNG文件
+    # plt.close()  # 关闭图像以释放内存
+
+
 
 
     # ## 测试集合
@@ -181,8 +201,8 @@ if __name__ == '__main__':
         # 创建数据加载器
         train_dataset = TensorDataset(X_train_pca, Y_train)
         val_dataset = TensorDataset(X_val_pca, Y_val)
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch, shuffle=False)
         # 创建模型
         input_size = X_train_pca.shape[1]
         hidden_size = 100
@@ -191,9 +211,9 @@ if __name__ == '__main__':
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         # 训练
-        num_epochs = 50
+        num_epochs = args.epoch
         for epoch in tqdm(range(num_epochs)):
             model.train()
             for inputs, labels in train_loader:
@@ -205,7 +225,7 @@ if __name__ == '__main__':
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            print(f'Epoch [{epoch+1}], Loss: {loss.item():.4f}')
+            # print(f'Epoch [{epoch+1}], Loss: {loss.item():.4f}')
         # 验证
         model.eval()
         with torch.no_grad():
@@ -220,3 +240,7 @@ if __name__ == '__main__':
             
             accuracy = 100 * correct / total
             print(f'Accuracy of the model on the val set: {accuracy:.2f}%')
+        accuracies.append(accuracy)
+
+    # 输出平均准确率和标准差
+    print(f"The average accuracy is {np.mean(accuracies):.2f}%, with a standard deviation of {np.std(accuracies):.2f}%.")
