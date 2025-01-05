@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
 
     ## 模型训练
-    model = MultiClassSVM(max_iter=args.max_iter)
+    model = MultiClassSVM(max_iter=args.max_iter, learning_rate=0.02)
     model.fit(X_train_pca, Y_train)
     X_verify_scaled = scaler.transform(X_verify)
     X_verify_pca = pca.transform(X_verify_scaled)
